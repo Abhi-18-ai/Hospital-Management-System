@@ -5,19 +5,27 @@
 const express = require('express');
 const { authenticate } = require('../../middlewares/auth.middleware');
 const { authorize } = require('../../middlewares/authorize.middleware');
+const { authorizeOwnership } = require('../../middlewares/authorize.middleware');
 const validate = require('../../middlewares/validate.middleware');
 const { ROLES } = require('../../utils/constants');
 const prescriptionValidation = require('./prescription.validation');
 const prescriptionController = require('./prescription.controller');
+const Patient = require('../patients/patient.model');
 
 const router = express.Router();
 
 const CAN_VIEW = [ROLES.SUPER_ADMIN, ROLES.HOSPITAL_ADMIN, ROLES.DOCTOR, ROLES.NURSE, ROLES.PHARMACIST, ROLES.PATIENT];
+const STAFF_ROLES = CAN_VIEW.filter((role) => role !== ROLES.PATIENT);
+const ownPatientPrescriptionsOnly = authorizeOwnership(async (req) => {
+  const patient = await Patient.findOne({ _id: req.params.patientId, userId: req.user.id }).select('_id');
+  return !!patient;
+}, STAFF_ROLES);
 
 router.get(
   '/:patientId/prescriptions',
   authenticate,
   authorize(...CAN_VIEW),
+  ownPatientPrescriptionsOnly,
   validate(prescriptionValidation.listPatientPrescriptions),
   prescriptionController.listForPatient
 );

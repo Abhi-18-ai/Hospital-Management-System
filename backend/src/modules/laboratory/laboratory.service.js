@@ -35,12 +35,16 @@ async function createLabOrder(payload, req) {
   return order;
 }
 
-async function listLabOrders(filters, { page, limit, skip }) {
+async function listLabOrders(filters, { page, limit, skip }, req) {
   const query = {};
   if (filters.patientId) query.patientId = filters.patientId;
   if (filters.doctorId) query.doctorId = filters.doctorId;
   if (filters.status) query.status = filters.status;
   if (filters.priority) query.priority = filters.priority;
+  if (req?.user?.role === 'patient') {
+    const ownPatient = await Patient.findOne({ userId: req.user.id }).select('_id');
+    query.patientId = ownPatient?._id || null;
+  }
 
   const [items, total] = await Promise.all([
     LabOrder.find(query)
@@ -55,11 +59,14 @@ async function listLabOrders(filters, { page, limit, skip }) {
   return { items, total };
 }
 
-async function getLabOrderById(id) {
+async function getLabOrderById(id, req) {
   const order = await LabOrder.findById(id)
     .populate('patientId', 'firstName lastName mrn userId')
     .populate('doctorId', 'firstName lastName specialization');
   if (!order) throw ApiError.notFound('Lab order not found.', 'LAB_ORDER_NOT_FOUND');
+  if (req?.user?.role === 'patient' && order.patientId?.userId?.toString() !== req.user.id) {
+    throw ApiError.forbidden('You are not permitted to access this lab order.', 'RESOURCE_ACCESS_DENIED');
+  }
   return order;
 }
 

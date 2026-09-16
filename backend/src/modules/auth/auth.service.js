@@ -1,6 +1,7 @@
 'use strict';
 
 const User = require('../users/user.model');
+const Patient = require('../patients/patient.model');
 const Session = require('./session.model');
 const ApiError = require('../../utils/ApiError');
 const auditService = require('../audit/audit.service');
@@ -26,6 +27,19 @@ async function register({ name, email, phone, password, role }, req) {
 
   const passwordHash = await User.hashPassword(password);
   const user = await User.create({ name, email, phone, passwordHash, role });
+
+  if (user.role === 'patient') {
+    const nameParts = user.name.trim().split(/\s+/);
+    const firstName = nameParts.shift() || user.name;
+    const lastName = nameParts.join(' ') || firstName;
+    await Patient.create({
+      userId: user._id,
+      firstName,
+      lastName,
+      gender: 'other',
+      contact: { phone: user.phone || 'Not provided', email: user.email },
+    });
+  }
 
   await auditService.record({
     req,

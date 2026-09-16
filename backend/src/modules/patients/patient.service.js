@@ -1,6 +1,7 @@
 'use strict';
 
 const Patient = require('./patient.model');
+const User = require('../users/user.model');
 const ApiError = require('../../utils/ApiError');
 const auditService = require('../audit/audit.service');
 const { AUDIT_ACTIONS } = require('../../utils/constants');
@@ -14,9 +15,16 @@ async function createPatient(payload, req) {
     mrn = generateCode('MRN');
   }
 
+  let userId = payload.userId || null;
+  if (!userId && payload.contact?.email) {
+    const account = await User.findOne({ email: payload.contact.email.toLowerCase(), role: 'patient' }).select('_id');
+    userId = account?._id || null;
+  }
+
   const patient = await Patient.create({
     ...payload,
     mrn,
+    userId,
     registeredBy: req.user.id,
   });
 
@@ -50,6 +58,32 @@ async function getPatientById(id) {
   const patient = await Patient.findById(id);
   if (!patient) throw ApiError.notFound('Patient not found.', 'PATIENT_NOT_FOUND');
   return patient;
+}
+
+async function getPatientByUserId(userId) {
+  const existingPatient = await Patient.findOne({ userId });
+  if (existingPatient) return existingPatient;
+
+  const user = await User.findById(userId);
+  if (!user) throw ApiError.notFound('Patient account not found.', 'PATIENT_ACCOUNT_NOT_FOUND');
+
+  const nameParts = user.name.trim().split(/\s+/);
+  const firstName = nameParts.shift() || user.name;
+  const lastName = nameParts.join(' ') || firstName;
+  let mrn = generateCode('MRN');
+  while (await Patient.exists({ mrn })) {
+    mrn = generateCode('MRN');
+  }
+
+  return Patient.create({
+    userId: user._id,
+    mrn,
+    firstName,
+    lastName,
+    gender: 'other',
+    contact: { phone: user.phone || 'Not provided', email: user.email },
+    registeredBy: user._id,
+  });
 }
 
 async function updatePatient(id, updates, req) {
@@ -115,6 +149,7 @@ module.exports = {
   createPatient,
   listPatients,
   getPatientById,
+  getPatientByUserId,
   updatePatient,
   getPatientHistory,
   getPatientAppointments,

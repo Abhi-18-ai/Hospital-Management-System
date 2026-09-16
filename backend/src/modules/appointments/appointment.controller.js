@@ -12,12 +12,12 @@ const create = asyncHandler(async (req, res) => {
 
 const list = asyncHandler(async (req, res) => {
   const pagination = getPagination(req.query);
-  const { items, total } = await appointmentService.listAppointments(req.query, pagination);
+  const { items, total } = await appointmentService.listAppointments(req.query, pagination, req);
   new ApiResponse(200, items, 'Appointments retrieved successfully.', buildMeta({ ...pagination, total })).send(res);
 });
 
 const getById = asyncHandler(async (req, res) => {
-  const appointment = await appointmentService.getAppointmentById(req.params.id);
+  const appointment = await appointmentService.getAppointmentById(req.params.id, req);
   new ApiResponse(200, appointment, 'Appointment retrieved successfully.').send(res);
 });
 

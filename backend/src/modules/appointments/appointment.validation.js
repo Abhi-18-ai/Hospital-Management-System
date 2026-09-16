@@ -6,7 +6,7 @@ const { APPOINTMENT_STATUS } = require('../../utils/constants');
 
 const createAppointment = {
   body: Joi.object({
-    patientId: objectIdRequired,
+    patientId: objectId,
     doctorId: objectIdRequired,
     departmentId: objectIdRequired,
     startAt: Joi.date().iso().greater('now').required(),

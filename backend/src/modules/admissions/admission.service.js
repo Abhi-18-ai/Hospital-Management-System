@@ -72,11 +72,15 @@ async function admitPatient(payload, req) {
   return admission;
 }
 
-async function listAdmissions(filters, { page, limit, skip }) {
+async function listAdmissions(filters, { page, limit, skip }, req) {
   const query = {};
   if (filters.patientId) query.patientId = filters.patientId;
   if (filters.status) query.status = filters.status;
   if (filters.ward) query.ward = filters.ward;
+  if (req?.user?.role === 'patient') {
+    const ownPatient = await Patient.findOne({ userId: req.user.id }).select('_id');
+    query.patientId = ownPatient?._id || null;
+  }
 
   const [items, total] = await Promise.all([
     Admission.find(query)
@@ -91,11 +95,14 @@ async function listAdmissions(filters, { page, limit, skip }) {
   return { items, total };
 }
 
-async function getAdmissionById(id) {
+async function getAdmissionById(id, req) {
   const admission = await Admission.findById(id)
     .populate('patientId', 'firstName lastName mrn userId')
     .populate('doctorId', 'firstName lastName specialization');
   if (!admission) throw ApiError.notFound('Admission not found.', 'ADMISSION_NOT_FOUND');
+  if (req?.user?.role === 'patient' && admission.patientId?.userId?.toString() !== req.user.id) {
+    throw ApiError.forbidden('You are not permitted to access this admission.', 'RESOURCE_ACCESS_DENIED');
+  }
   return admission;
 }
 

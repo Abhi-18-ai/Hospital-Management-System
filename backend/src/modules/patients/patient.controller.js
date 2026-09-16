@@ -21,6 +21,11 @@ const getById = asyncHandler(async (req, res) => {
   new ApiResponse(200, patient, 'Patient retrieved successfully.').send(res);
 });
 
+const getMine = asyncHandler(async (req, res) => {
+  const patient = await patientService.getPatientByUserId(req.user.id);
+  new ApiResponse(200, patient, 'Patient profile retrieved successfully.').send(res);
+});
+
 const update = asyncHandler(async (req, res) => {
   const patient = await patientService.updatePatient(req.params.id, req.body, req);
   new ApiResponse(200, patient, 'Patient updated successfully.').send(res);
@@ -39,4 +44,4 @@ const getAppointments = asyncHandler(async (req, res) => {
   );
 });
 
-module.exports = { create, list, getById, update, getHistory, getAppointments };
+module.exports = { create, list, getById, getMine, update, getHistory, getAppointments };

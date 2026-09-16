@@ -32,8 +32,13 @@ async function getUserById(id) {
 async function updateUser(id, updates, req) {
   const user = await getUserById(id);
 
-  // Only super admins may change roles; enforced additionally at route level,
-  // but we defensively strip role changes here unless explicitly authorized upstream.
+  if (updates.role !== undefined && req.user.role !== ROLES.SUPER_ADMIN) {
+    throw ApiError.forbidden('Only a super admin can assign user roles.', 'ROLE_ASSIGNMENT_FORBIDDEN');
+  }
+  if (updates.role !== undefined && req.user.id === user._id.toString()) {
+    throw ApiError.badRequest('You cannot change your own role.', 'CANNOT_CHANGE_OWN_ROLE');
+  }
+
   if (updates.name !== undefined) user.name = updates.name;
   if (updates.phone !== undefined) user.phone = updates.phone;
   if (updates.role !== undefined) user.role = updates.role;

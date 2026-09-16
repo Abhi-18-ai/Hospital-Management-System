@@ -87,7 +87,7 @@ async function createInvoice(payload, req) {
   return invoice;
 }
 
-async function listInvoices(filters, { page, limit, skip }) {
+async function listInvoices(filters, { page, limit, skip }, req) {
   const query = {};
   if (filters.patientId) query.patientId = filters.patientId;
   if (filters.status) query.status = filters.status;
@@ -95,6 +95,10 @@ async function listInvoices(filters, { page, limit, skip }) {
     query.issuedAt = {};
     if (filters.from) query.issuedAt.$gte = new Date(filters.from);
     if (filters.to) query.issuedAt.$lte = new Date(filters.to);
+  }
+  if (req?.user?.role === 'patient') {
+    const ownPatient = await Patient.findOne({ userId: req.user.id }).select('_id');
+    query.patientId = ownPatient?._id || null;
   }
 
   const [items, total] = await Promise.all([
@@ -109,9 +113,12 @@ async function listInvoices(filters, { page, limit, skip }) {
   return { items, total };
 }
 
-async function getInvoiceById(id) {
+async function getInvoiceById(id, req) {
   const invoice = await Invoice.findById(id).populate('patientId', 'firstName lastName mrn userId');
   if (!invoice) throw ApiError.notFound('Invoice not found.', 'INVOICE_NOT_FOUND');
+  if (req?.user?.role === 'patient' && invoice.invoice.patientId?.userId?.toString() !== req.user.id) {
+    throw ApiError.forbidden('You are not permitted to access this invoice.', 'RESOURCE_ACCESS_DENIED');
+  }
 
   const payments = await Payment.find({ invoiceId: id }).sort({ paidAt: -1 });
   return { invoice, payments };

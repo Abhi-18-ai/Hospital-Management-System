@@ -8,7 +8,7 @@ const ApiError = require('../../utils/ApiError');
 const auditService = require('../audit/audit.service');
 const notificationService = require('../notifications/notification.service');
 const emailService = require('../notifications/email.service');
-const { AUDIT_ACTIONS, APPOINTMENT_STATUS, NOTIFICATION_TYPE } = require('../../utils/constants');
+const { AUDIT_ACTIONS, APPOINTMENT_STATUS, NOTIFICATION_TYPE, ROLES } = require('../../utils/constants');
 
 const ACTIVE_STATUSES = [
   APPOINTMENT_STATUS.SCHEDULED,
@@ -39,8 +39,16 @@ async function assertNoConflict(doctorId, startAt, endAt, excludeAppointmentId =
 }
 
 async function bookAppointment(payload, req) {
+  let patientId = payload.patientId;
+  if (req.user.role === ROLES.PATIENT) {
+    const ownPatient = await Patient.findOne({ userId: req.user.id }).select('_id');
+    if (!ownPatient) throw ApiError.notFound('Patient profile not found.', 'PATIENT_PROFILE_NOT_FOUND');
+    patientId = ownPatient._id;
+  }
+  if (!patientId) throw ApiError.badRequest('Patient is required.', 'PATIENT_REQUIRED');
+
   const [patient, doctor, department] = await Promise.all([
-    Patient.findById(payload.patientId),
+    Patient.findById(patientId),
     Doctor.findById(payload.doctorId),
     Department.findById(payload.departmentId),
   ]);
@@ -53,7 +61,7 @@ async function bookAppointment(payload, req) {
 
   await assertNoConflict(payload.doctorId, new Date(payload.startAt), new Date(payload.endAt));
 
-  const appointment = await Appointment.create({ ...payload, createdBy: req.user.id });
+  const appointment = await Appointment.create({ ...payload, patientId, createdBy: req.user.id });
 
   await auditService.record({
     req,
@@ -87,7 +95,7 @@ async function bookAppointment(payload, req) {
   return appointment;
 }
 
-async function listAppointments(filters, { page, limit, skip }) {
+async function listAppointments(filters, { page, limit, skip }, req) {
   const query = {};
   if (filters.patientId) query.patientId = filters.patientId;
   if (filters.doctorId) query.doctorId = filters.doctorId;
@@ -97,6 +105,11 @@ async function listAppointments(filters, { page, limit, skip }) {
     query.startAt = {};
     if (filters.from) query.startAt.$gte = new Date(filters.from);
     if (filters.to) query.startAt.$lte = new Date(filters.to);
+  }
+
+  if (req?.user?.role === ROLES.PATIENT) {
+    const ownPatient = await Patient.findOne({ userId: req.user.id }).select('_id');
+    query.patientId = ownPatient?._id || null;
   }
 
   const [items, total] = await Promise.all([
@@ -113,12 +126,15 @@ async function listAppointments(filters, { page, limit, skip }) {
   return { items, total };
 }
 
-async function getAppointmentById(id) {
+async function getAppointmentById(id, req) {
   const appointment = await Appointment.findById(id)
     .populate('patientId', 'firstName lastName mrn userId')
     .populate('doctorId', 'firstName lastName specialization')
     .populate('departmentId', 'name');
   if (!appointment) throw ApiError.notFound('Appointment not found.', 'APPOINTMENT_NOT_FOUND');
+  if (req?.user?.role === ROLES.PATIENT && appointment.patientId?.userId?.toString() !== req.user.id) {
+    throw ApiError.forbidden('You are not permitted to access this appointment.', 'RESOURCE_ACCESS_DENIED');
+  }
   return appointment;
 }
 
@@ -164,6 +180,9 @@ async function updateAppointment(id, updates, req) {
 async function cancelAppointment(id, reason, req) {
   const appointment = await Appointment.findById(id).populate('patientId').populate('doctorId');
   if (!appointment) throw ApiError.notFound('Appointment not found.', 'APPOINTMENT_NOT_FOUND');
+  if (req.user.role === ROLES.PATIENT && appointment.patientId?.userId?.toString() !== req.user.id) {
+    throw ApiError.forbidden('You are not permitted to cancel this appointment.', 'RESOURCE_ACCESS_DENIED');
+  }
   assertMutable(appointment);
 
   const originalStartAt = appointment.startAt;

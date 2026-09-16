@@ -9,7 +9,7 @@ const patientSchema = new mongoose.Schema(
     mrn: { type: String, required: true, unique: true, index: true }, // Medical Record Number
     firstName: { type: String, required: true, trim: true, maxlength: 80 },
     lastName: { type: String, required: true, trim: true, maxlength: 80 },
-    dateOfBirth: { type: Date, required: true },
+    dateOfBirth: { type: Date, default: null },
     gender: { type: String, enum: ['male', 'female', 'other'], required: true },
     bloodGroup: {
       type: String,

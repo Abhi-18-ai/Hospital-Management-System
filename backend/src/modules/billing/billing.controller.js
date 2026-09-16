@@ -12,12 +12,12 @@ const createInvoice = asyncHandler(async (req, res) => {
 
 const listInvoices = asyncHandler(async (req, res) => {
   const pagination = getPagination(req.query);
-  const { items, total } = await billingService.listInvoices(req.query, pagination);
+  const { items, total } = await billingService.listInvoices(req.query, pagination, req);
   new ApiResponse(200, items, 'Invoices retrieved successfully.', buildMeta({ ...pagination, total })).send(res);
 });
 
 const getInvoiceById = asyncHandler(async (req, res) => {
-  const data = await billingService.getInvoiceById(req.params.id);
+  const data = await billingService.getInvoiceById(req.params.id, req);
   new ApiResponse(200, data, 'Invoice retrieved successfully.').send(res);
 });
 

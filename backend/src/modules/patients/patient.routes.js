@@ -43,6 +43,9 @@ router.post(
 // GET /api/v1/patients - List/search patients.
 router.get('/', authenticate, authorize(...STAFF_ROLES), validate(patientValidation.listPatients), patientController.list);
 
+// GET /api/v1/patients/me - Get the authenticated patient's own profile.
+router.get('/me', authenticate, authorize(ROLES.PATIENT), patientController.getMine);
+
 // GET /api/v1/patients/:id - Get patient.
 router.get(
   '/:id',

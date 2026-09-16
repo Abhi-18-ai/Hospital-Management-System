@@ -12,12 +12,12 @@ const create = asyncHandler(async (req, res) => {
 
 const list = asyncHandler(async (req, res) => {
   const pagination = getPagination(req.query);
-  const { items, total } = await labService.listLabOrders(req.query, pagination);
+  const { items, total } = await labService.listLabOrders(req.query, pagination, req);
   new ApiResponse(200, items, 'Lab orders retrieved successfully.', buildMeta({ ...pagination, total })).send(res);
 });
 
 const getById = asyncHandler(async (req, res) => {
-  const order = await labService.getLabOrderById(req.params.id);
+  const order = await labService.getLabOrderById(req.params.id, req);
   new ApiResponse(200, order, 'Lab order retrieved successfully.').send(res);
 });
 

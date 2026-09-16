@@ -12,12 +12,12 @@ const admit = asyncHandler(async (req, res) => {
 
 const list = asyncHandler(async (req, res) => {
   const pagination = getPagination(req.query);
-  const { items, total } = await admissionService.listAdmissions(req.query, pagination);
+  const { items, total } = await admissionService.listAdmissions(req.query, pagination, req);
   new ApiResponse(200, items, 'Admissions retrieved successfully.', buildMeta({ ...pagination, total })).send(res);
 });
 
 const getById = asyncHandler(async (req, res) => {
-  const admission = await admissionService.getAdmissionById(req.params.id);
+  const admission = await admissionService.getAdmissionById(req.params.id, req);
   new ApiResponse(200, admission, 'Admission retrieved successfully.').send(res);
 });
 
